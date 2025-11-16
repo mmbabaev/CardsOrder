@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import List, Optional
 
 
 @dataclass
@@ -16,11 +17,11 @@ class Card:
         is_foil (bool): Является ли карта фойловой (foil).
         condition (str): Состояние карты (NM, EX, LP, MP, HP, DMG).
         edition (str): Полное название издания.
-        edition_code (str | None): Короткий код издания (например, BRO, MH3). Опционально.
+        edition_code (Optional[str]): Короткий код издания (например, BRO, MH3). Опционально.
         price_per_unit (Decimal): Цена за одну карту в USD.
         total_price (Decimal): Итоговая сумма (quantity * price_per_unit).
         rarity (str): Редкость карты (C - Common, U - Uncommon, R - Rare, M - Mythic, S - Special).
-        variation (str | None): Вариация карты (например, "1743 - Foil", "Borderless"). Опционально.
+        variation (Optional[str]): Вариация карты (например, "1743 - Foil", "Borderless"). Опционально.
     """
     
     quantity: int
@@ -29,13 +30,13 @@ class Card:
     is_foil: bool
     condition: str
     edition: str
-    edition_code: str | None
+    edition_code: Optional[str]
     price_per_unit: Decimal
     total_price: Decimal
     rarity: str
-    variation: str | None
+    variation: Optional[str]
 
-    def to_excel_row(self) -> list:
+    def to_excel_row(self) -> List:
         """
         Возвращает данные карты в виде списка значений для записи в Excel.
         

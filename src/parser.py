@@ -4,7 +4,7 @@ import logging
 import re
 from decimal import Decimal
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from bs4 import BeautifulSoup
 
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 BASE_URL = "https://www.cardkingdom.com/"
 
 
-def parse_cart_html(html_path: str) -> list[Card]:
+def parse_cart_html(html_path: str) -> List[Card]:
     """
     Парсит HTML файл корзины Card Kingdom и извлекает данные о карточках.
     
@@ -147,7 +147,14 @@ def _parse_card_item(item_div) -> Card:
         raise ValueError(f"Невалидное значение quantity: {quantity_str}")
     
     # Извлечение цены за единицу
-    price_small = item_div.find('small')
+    # Ищем все small элементы и находим тот, который содержит "/ea"
+    price_small = None
+    for small in item_div.find_all('small'):
+        text = small.get_text(strip=True)
+        if '/ea' in text:
+            price_small = small
+            break
+    
     if not price_small:
         raise ValueError("Не найден элемент small с ценой")
     
