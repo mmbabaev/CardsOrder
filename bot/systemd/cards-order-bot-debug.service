@@ -1,6 +1,6 @@
 [Unit]
 Description=Card Kingdom Order Telegram Bot (DEBUG)
-After=network.target
+After=network.target otel-collector-debug.service
 
 [Service]
 Type=simple

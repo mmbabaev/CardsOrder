@@ -1,0 +1,18 @@
+[Unit]
+Description=OpenTelemetry Collector (Monium, DEBUG)
+After=network.target
+Before=cards-order-bot-debug.service
+
+[Service]
+Type=simple
+User=mbabaev
+WorkingDirectory=/home/mbabaev/CardsOrderDebug
+EnvironmentFile=/home/mbabaev/CardsOrderDebug/bot/.env
+ExecStart=/usr/local/bin/otelcol --config /home/mbabaev/CardsOrderDebug/otel-collector.yaml
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

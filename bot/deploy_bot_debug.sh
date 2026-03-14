@@ -28,6 +28,8 @@ if [[ "$MODE" == "debug" ]]; then
     SERVICE_NAME="cards-order-bot-debug"
     ENV_FILE=".env.debug"
     SYSTEMD_SERVICE="cards-order-bot-debug.service"
+    OTEL_SERVICE="otel-collector-debug.service"
+    OTEL_SERVICE_NAME="otel-collector-debug"
 else
     SERVER="84.201.152.61"
     SSH_KEY="$HOME/.ssh/kara_ssh_key"
@@ -36,6 +38,8 @@ else
     SERVICE_NAME="cards-order-bot"
     ENV_FILE=".env"
     SYSTEMD_SERVICE="cards-order-bot.service"
+    OTEL_SERVICE="otel-collector.service"
+    OTEL_SERVICE_NAME="otel-collector"
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -135,13 +139,13 @@ install_on_server() {
         fi
 
         echo "→ Установка systemd сервисов..."
-        sudo cp $REMOTE_DIR/bot/systemd/otel-collector.service /etc/systemd/system/
+        sudo cp $REMOTE_DIR/bot/systemd/$OTEL_SERVICE /etc/systemd/system/
         sudo cp $REMOTE_DIR/bot/systemd/$SYSTEMD_SERVICE /etc/systemd/system/
         sudo systemctl daemon-reload
 
         echo "→ Активация и запуск OTel Collector..."
-        sudo systemctl enable otel-collector
-        sudo systemctl restart otel-collector
+        sudo systemctl enable $OTEL_SERVICE_NAME
+        sudo systemctl restart $OTEL_SERVICE_NAME
 
         echo "→ Активация и запуск бота..."
         sudo systemctl enable $SERVICE_NAME
