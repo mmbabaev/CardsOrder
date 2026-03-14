@@ -8,12 +8,14 @@ from bs4 import BeautifulSoup
 
 from src.base_parser import BaseCartParser
 from src.parsers.card_kingdom_parser import CardKingdomParser
+from src.parsers.starcitygames_parser import StarCityGamesParser
 
 logger = logging.getLogger(__name__)
 
 # All registered parsers, tried in order
 _PARSERS: List[Type[BaseCartParser]] = [
     CardKingdomParser,
+    StarCityGamesParser,
 ]
 
 
