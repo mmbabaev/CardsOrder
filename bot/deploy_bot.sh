@@ -68,22 +68,22 @@ check_variables() {
 create_archive() {
     print_info "Создание архива с кодом бота..."
     
-    cd "$SCRIPT_DIR"
-    
+    cd "$PROJECT_ROOT"
+
     # Создаем архив, исключая ненужные файлы
     tar -czf "$TEMP_ARCHIVE" \
         --exclude='__pycache__' \
         --exclude='*.pyc' \
-        --exclude='.env' \
+        --exclude='.env*' \
         --exclude='*.log' \
         --exclude='.pytest_cache' \
-        --exclude='node_modules' \
-        bot.py \
-        bot_handlers.py \
-        bot_parser_service.py \
-        requirements-bot.txt \
-        .env.example \
-        systemd/
+        --exclude='tests/' \
+        --exclude='venv/' \
+        bot/bot.py \
+        bot/bot_handlers.py \
+        bot/requirements-bot.txt \
+        bot/systemd/ \
+        src/
     
     print_success "Архив создан: $TEMP_ARCHIVE"
 }
@@ -108,11 +108,10 @@ install_on_server() {
         set -e
         
         echo "→ Создание директорий..."
-        mkdir -p $REMOTE_DIR/bot
-        
+        mkdir -p $REMOTE_DIR
+
         echo "→ Распаковка архива..."
-        cd $REMOTE_DIR
-        tar -xzf /tmp/$ARCHIVE_NAME -C bot/
+        tar -xzf /tmp/$ARCHIVE_NAME -C $REMOTE_DIR/
         
         echo "→ Создание виртуального окружения..."
         if [ ! -d "$REMOTE_DIR/venv" ]; then
