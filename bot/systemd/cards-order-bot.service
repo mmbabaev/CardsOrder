@@ -4,12 +4,12 @@ After=network.target otel-collector.service
 
 [Service]
 Type=simple
-User=kara
-WorkingDirectory=/home/kara/CardsOrder
-Environment="PATH=/home/kara/CardsOrder/venv/bin"
-Environment="PYTHONPATH=/home/kara/CardsOrder"
-EnvironmentFile=/home/kara/CardsOrder/bot/.env
-ExecStart=/home/kara/CardsOrder/venv/bin/python src/bot/bot.py
+User=mbabaev
+WorkingDirectory=/home/mbabaev/CardsOrder
+Environment="PATH=/home/mbabaev/CardsOrder/venv/bin"
+Environment="PYTHONPATH=/home/mbabaev/CardsOrder"
+EnvironmentFile=/home/mbabaev/CardsOrder/bot/.env
+ExecStart=/home/mbabaev/CardsOrder/venv/bin/python src/bot/bot.py
 Restart=always
 RestartSec=10
 StandardOutput=journal

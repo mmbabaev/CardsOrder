@@ -5,10 +5,10 @@ Before=cards-order-bot.service
 
 [Service]
 Type=simple
-User=kara
-WorkingDirectory=/home/kara/CardsOrder
-EnvironmentFile=/home/kara/CardsOrder/bot/.env
-ExecStart=/usr/local/bin/otelcol --config /home/kara/CardsOrder/otel-collector.yaml
+User=mbabaev
+WorkingDirectory=/home/mbabaev/CardsOrder
+EnvironmentFile=/home/mbabaev/CardsOrder/bot/.env
+ExecStart=/usr/local/bin/otelcol --config /home/mbabaev/CardsOrder/otel-collector.yaml
 Restart=always
 RestartSec=10
 StandardOutput=journal
