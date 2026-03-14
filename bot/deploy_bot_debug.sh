@@ -21,7 +21,7 @@ fi
 
 # ====== НАСТРОЙКИ ======
 if [[ "$MODE" == "debug" ]]; then
-    SERVER="178.154.217.6"
+    SERVER="158.160.9.28"
     SSH_KEY="$HOME/.ssh/ssh-key-kara"
     REMOTE_USER="mbabaev"
     REMOTE_DIR="/home/mbabaev/CardsOrderDebug"
