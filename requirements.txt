@@ -7,10 +7,10 @@ click==8.1.7
 # Опциональные зависимости (для расширенных функций)
 requests==2.31.0
 
-# Телеметрия Monium (OpenTelemetry)
-opentelemetry-api==1.27.0
-opentelemetry-sdk==1.27.0
-opentelemetry-exporter-otlp-proto-grpc==1.27.0
+# Телеметрия Monium (OpenTelemetry) — HTTP exporter (gRPC incompatible with Python 3.14)
+opentelemetry-api==1.40.0
+opentelemetry-sdk==1.40.0
+opentelemetry-exporter-otlp-proto-http==1.40.0
 
 # Разработка
 pytest==7.4.3

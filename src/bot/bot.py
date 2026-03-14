@@ -27,11 +27,9 @@ def main():
         SystemExit: При отсутствии BOT_TOKEN в переменных окружения
         Exception: При критических ошибках инициализации
     """
-    # Загрузка переменных окружения
-    load_dotenv()
-
-    # Инициализация телеметрии Monium (graceful no-op если MONIUM_API_KEY не задан)
-    init_telemetry()
+    # Загрузка переменных окружения (bot/.env или .env в корне)
+    load_dotenv(Path(__file__).parent.parent.parent / 'bot' / '.env')
+    load_dotenv()  # fallback: .env в cwd
 
     # Настройка логирования
     log_level = os.getenv('LOG_LEVEL', 'INFO')
@@ -40,6 +38,9 @@ def main():
         level=getattr(logging, log_level.upper())
     )
     logger = logging.getLogger(__name__)
+
+    # Инициализация телеметрии Monium (graceful no-op если MONIUM_API_KEY не задан)
+    init_telemetry()
     
     # Создание временной директории
     temp_dir = os.getenv('TEMP_DIR', '/tmp/cards-order-bot')

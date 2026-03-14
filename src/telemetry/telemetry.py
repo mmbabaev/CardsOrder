@@ -42,19 +42,17 @@ def init_telemetry() -> bool:
         from opentelemetry.sdk.metrics import MeterProvider
         from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
         from opentelemetry.sdk.resources import Resource, SERVICE_NAME
-        from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
-        from grpc import Compression
+        from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
 
         project = os.getenv('MONIUM_PROJECT', '')
         service_name = os.getenv('OTEL_SERVICE_NAME', 'cards-order-bot')
 
         exporter = OTLPMetricExporter(
-            endpoint='ingest.monium.yandex.cloud:443',
-            headers=(
-                ('authorization', f'Api-Key {api_key}'),
-                ('x-monium-project', project),
-            ),
-            compression=Compression.Gzip,
+            endpoint='https://ingest.monium.yandex.cloud/v1/metrics',
+            headers={
+                'Authorization': f'Api-Key {api_key}',
+                'x-monium-project': project,
+            },
         )
 
         reader = PeriodicExportingMetricReader(exporter, export_interval_millis=60_000)
