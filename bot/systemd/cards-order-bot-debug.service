@@ -1,0 +1,19 @@
+[Unit]
+Description=Card Kingdom Order Telegram Bot (DEBUG)
+After=network.target
+
+[Service]
+Type=simple
+User=kara
+WorkingDirectory=/home/kara/CardsOrderDebug
+Environment="PATH=/home/kara/CardsOrderDebug/venv/bin"
+Environment="PYTHONPATH=/home/kara/CardsOrderDebug"
+EnvironmentFile=/home/kara/CardsOrderDebug/bot/.env
+ExecStart=/home/kara/CardsOrderDebug/venv/bin/python bot/bot.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

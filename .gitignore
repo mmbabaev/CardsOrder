@@ -43,6 +43,7 @@ edition_codes_cache.json
 # Environment / secrets
 .env
 .env.local
+.env.debug
 
 # OS
 .DS_Store
