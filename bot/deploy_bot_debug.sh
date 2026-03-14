@@ -78,6 +78,7 @@ create_archive() {
         --exclude='venv/' \
         bot/requirements-bot.txt \
         bot/systemd/ \
+        otel-collector.yaml \
         src/
 
     print_success "Архив создан: $TEMP_ARCHIVE"
@@ -120,11 +121,29 @@ install_on_server() {
         $REMOTE_DIR/venv/bin/pip install --upgrade pip -q
         $REMOTE_DIR/venv/bin/pip install -r $REMOTE_DIR/bot/requirements-bot.txt -q
 
-        echo "→ Установка systemd сервиса..."
+        echo "→ Установка otelcol (если не установлен)..."
+        if [ ! -f /usr/local/bin/otelcol ]; then
+            OTELCOL_VERSION="0.114.0"
+            wget -q "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v\${OTELCOL_VERSION}/otelcol_\${OTELCOL_VERSION}_linux_amd64.tar.gz" -O /tmp/otelcol.tar.gz
+            tar -xzf /tmp/otelcol.tar.gz -C /tmp otelcol
+            sudo mv /tmp/otelcol /usr/local/bin/otelcol
+            sudo chmod +x /usr/local/bin/otelcol
+            rm /tmp/otelcol.tar.gz
+            echo "  otelcol установлен: \$(otelcol --version)"
+        else
+            echo "  otelcol уже установлен: \$(otelcol --version)"
+        fi
+
+        echo "→ Установка systemd сервисов..."
+        sudo cp $REMOTE_DIR/bot/systemd/otel-collector.service /etc/systemd/system/
         sudo cp $REMOTE_DIR/bot/systemd/$SYSTEMD_SERVICE /etc/systemd/system/
         sudo systemctl daemon-reload
 
-        echo "→ Активация и запуск сервиса..."
+        echo "→ Активация и запуск OTel Collector..."
+        sudo systemctl enable otel-collector
+        sudo systemctl restart otel-collector
+
+        echo "→ Активация и запуск бота..."
         sudo systemctl enable $SERVICE_NAME
         sudo systemctl restart $SERVICE_NAME
 
