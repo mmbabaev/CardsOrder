@@ -4,7 +4,7 @@ import pytest
 from decimal import Decimal
 from pathlib import Path
 
-from src.parser import parse_cart_html, _parse_card_item
+from src.parser import parse_cart_html
 from src.models import Card
 
 
