@@ -1,38 +1,27 @@
-receivers:       # Конфигурация входящих данных (метрик, логов, трассировок)
-  otlp:          # Тип приемника — OTLP (OpenTelemetry Protocol)
-    protocols:   # Протоколы, по которым Collector будет ожидать данные
-      grpc:      # gRPC, порт 4317 по умолчанию
-      http:      # HTTP, порт 4318 по умолчанию
+receivers:
+  otlp:
+    protocols:
+      grpc:   # порт 4317
+      http:   # порт 4318 — сюда шлёт Python SDK
 
-exporters:       # Параметры принимающей системы — Monium
-  otlp_grpc/monium:
+processors:
+  batch:
+
+exporters:
+  otlp/monium:
     compression: zstd
     endpoint: ingest.monium.yandex.cloud:443
     headers:
       Authorization: "Api-Key ${env:MONIUM_API_KEY}"
       x-monium-project: "${env:MONIUM_PROJECT}"
-    sending_queue:
-      batch:
 
-service:         # Маршрутизация обработки данных в Collector
+service:
   pipelines:
-    metrics:     # Передача метрик, также можно добавить разделы traces и logs
-      receivers: [ otlp ]
-      exporters: [ otlp_grpc/monium ]
-    traces:
-      receivers: [ otlp ]
-      exporters: [ otlp_grpc/monium ]
     logs:
       receivers: [ otlp ]
-      exporters: [ otlp_grpc/monium ]
+      processors: [ batch ]
+      exporters: [ otlp/monium ]
+
   telemetry:
-    metrics:
-      level: normal
-      readers:
-        - periodic:
-            exporter:
-              otlp:
-                protocol: http/protobuf
-                endpoint: http://localhost:4318
-            interval: 30000
-            timeout: 5000
+    logs:
+      level: info

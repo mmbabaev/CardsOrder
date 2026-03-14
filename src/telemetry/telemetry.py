@@ -1,111 +1,93 @@
-"""Monium telemetry: OTel metrics for the Telegram bot.
+"""Monium telemetry: OTel logs for the Telegram bot.
 
-Set MONIUM_API_KEY and MONIUM_PROJECT env vars to enable.
+Architecture: SDK → OTel Collector (localhost:4318) → Monium gRPC.
+
+Set MONIUM_API_KEY to enable (used as a feature flag — actual auth is in otel-collector.yaml).
 If not set, all calls are silent no-ops.
 """
 
 import os
+import time
 import logging
 
 logger = logging.getLogger(__name__)
 
-# Instruments are None until init_telemetry() succeeds
-_commands_counter = None
-_requests_counter = None
-_processing_duration = None
-_order_cards = None
-_order_price = None
+_otel_logger = None
 
 
 def init_telemetry() -> bool:
-    """Initialize OTel metrics exporter to Monium.
+    """Initialize OTel log exporter to Monium.
 
     Required env vars:
-      MONIUM_API_KEY   — Yandex Cloud API key with monium.telemetry.writer role
-      MONIUM_PROJECT   — Monium project name, e.g. folder__b1g86q4m5vej...
+      MONIUM_API_KEY   — used as feature flag (auth is handled by OTel Collector)
 
     Optional:
-      OTEL_SERVICE_NAME  (default: cards-order-bot)
+      OTEL_SERVICE_NAME           (default: cards-order-bot)
+      OTEL_EXPORTER_OTLP_ENDPOINT (default: http://localhost:4318)
 
     Returns True if initialized, False if disabled or setup failed.
     """
-    global _commands_counter, _requests_counter
-    global _processing_duration, _order_cards, _order_price
+    global _otel_logger
 
     api_key = os.getenv('MONIUM_API_KEY')
     if not api_key:
-        logger.info("MONIUM_API_KEY not set — metrics disabled")
+        logger.info("MONIUM_API_KEY not set — logs disabled")
         return False
 
     try:
-        from opentelemetry import metrics
-        from opentelemetry.sdk.metrics import MeterProvider
-        from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+        from opentelemetry._logs import set_logger_provider
+        from opentelemetry.sdk._logs import LoggerProvider
+        from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+        from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
         from opentelemetry.sdk.resources import Resource, SERVICE_NAME
-        from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
 
-        project = os.getenv('MONIUM_PROJECT', '')
         service_name = os.getenv('OTEL_SERVICE_NAME', 'cards-order-bot')
+        # SDK отправляет на локальный OTel Collector; он сам передаёт в Monium с auth
+        collector_endpoint = os.getenv('OTEL_EXPORTER_OTLP_ENDPOINT', 'http://localhost:4318')
 
-        exporter = OTLPMetricExporter(
-            endpoint='https://ingest.monium.yandex.cloud/v1/metrics',
-            headers={
-                'Authorization': f'Api-Key {api_key}',
-                'x-monium-project': project,
-            },
-        )
+        exporter = OTLPLogExporter(endpoint=collector_endpoint)
 
-        reader = PeriodicExportingMetricReader(exporter, export_interval_millis=60_000)
-        provider = MeterProvider(
+        provider = LoggerProvider(
             resource=Resource(attributes={SERVICE_NAME: service_name}),
-            metric_readers=[reader],
         )
-        metrics.set_meter_provider(provider)
+        provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
+        set_logger_provider(provider)
 
-        meter = metrics.get_meter('cards-order-bot')
+        _otel_logger = provider.get_logger('cards-order-bot')
 
-        _commands_counter = meter.create_counter(
-            'bot_commands_total',
-            description='Bot commands received (/start, /help)',
-        )
-        _requests_counter = meter.create_counter(
-            'bot_requests_total',
-            description='Parse requests by type and outcome',
-        )
-        _processing_duration = meter.create_histogram(
-            'bot_processing_duration_seconds',
-            unit='s',
-            description='End-to-end processing time (download → parse → excel)',
-        )
-        _order_cards = meter.create_histogram(
-            'bot_order_unique_cards',
-            description='Unique card count per successful order',
-        )
-        _order_price = meter.create_histogram(
-            'bot_order_price_usd',
-            unit='USD',
-            description='Total order price per successful parse',
-        )
-
-        logger.info(f"Monium telemetry enabled (project={project!r}, service={service_name!r})")
+        logger.info(f"Monium telemetry enabled (collector={collector_endpoint!r}, service={service_name!r})")
         return True
 
     except ImportError as e:
-        logger.warning(f"OpenTelemetry packages not installed — metrics disabled: {e}")
+        logger.warning(f"OpenTelemetry packages not installed — logs disabled: {e}")
         return False
     except Exception as e:
         logger.error(f"Failed to initialize Monium telemetry: {e}")
         return False
 
 
+def _emit(body: str, attributes: dict) -> None:
+    if _otel_logger is None:
+        return
+    from opentelemetry.sdk._logs._internal import LogRecord
+    from opentelemetry._logs import SeverityNumber
+
+    _otel_logger.emit(LogRecord(
+        timestamp=time.time_ns(),
+        severity_number=SeverityNumber.INFO,
+        severity_text='INFO',
+        body=body,
+        attributes=attributes,
+    ))
+
+
 def record_command(command: str) -> None:
-    """Increment the command counter. command: 'start' | 'help'."""
-    if _commands_counter is not None:
-        _commands_counter.add(1, {'command': command})
+    """Log a bot command (/start, /help)."""
+    _emit('bot_command', {'event': 'command', 'command': command})
 
 
 def record_request(input_type: str, status: str, site: str = '') -> None:
-    """Increment the request counter.
+    """Log a parse request outcome.
 
     Args:
         input_type: 'document' | 'text'
@@ -114,19 +96,18 @@ def record_request(input_type: str, status: str, site: str = '') -> None:
                     'error_parse' | 'error_os' | 'error_unknown'
         site:       detected site slug, e.g. 'card_kingdom' (empty on error)
     """
-    if _requests_counter is not None:
-        attrs: dict = {'input_type': input_type, 'status': status}
-        if site:
-            attrs['site'] = site.lower().replace(' ', '_')
-        _requests_counter.add(1, attrs)
+    attrs: dict = {'event': 'request', 'input_type': input_type, 'status': status}
+    if site:
+        attrs['site'] = site.lower().replace(' ', '_')
+    _emit('bot_request', attrs)
 
 
 def record_processing(duration: float, site: str, total_cards: int, total_price: float) -> None:
-    """Record timing and order-size metrics for a successful parse."""
-    attrs = {'site': site.lower().replace(' ', '_')}
-    if _processing_duration is not None:
-        _processing_duration.record(duration, attrs)
-    if _order_cards is not None:
-        _order_cards.record(total_cards, attrs)
-    if _order_price is not None:
-        _order_price.record(total_price, attrs)
+    """Log timing and order-size data for a successful parse."""
+    _emit('bot_processing', {
+        'event': 'processing',
+        'site': site.lower().replace(' ', '_'),
+        'duration_seconds': round(duration, 2),
+        'total_cards': total_cards,
+        'total_price_usd': round(total_price, 2),
+    })
