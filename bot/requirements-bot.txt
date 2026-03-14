@@ -10,3 +10,8 @@ click==8.1.7
 
 # Optional dependencies (for extended functionality)
 requests==2.31.0
+
+# Monium telemetry (OpenTelemetry)
+opentelemetry-api==1.27.0
+opentelemetry-sdk==1.27.0
+opentelemetry-exporter-otlp-proto-grpc==1.27.0

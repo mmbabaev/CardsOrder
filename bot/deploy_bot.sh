@@ -44,7 +44,7 @@ print_info() {
 
 # Проверка, что скрипт запущен из правильной директории
 check_directory() {
-    if [[ ! -f "$SCRIPT_DIR/bot.py" ]]; then
+    if [[ ! -f "$SCRIPT_DIR/requirements-bot.txt" ]]; then
         print_error "Скрипт должен находиться в директории bot/"
         exit 1
     fi

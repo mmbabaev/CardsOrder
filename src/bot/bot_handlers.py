@@ -7,7 +7,7 @@ import logging
 import time
 from pathlib import Path
 from src.parsers.parser_service import parse_and_generate
-from src.telemetry import record_command, record_request, record_processing
+from src.telemetry import record_command, record_request, record_processing, BotCommand, InputType, RequestStatus
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     user_id = update.effective_user.id
     logger.info(f"User {user_id} started the bot")
-    record_command('start')
+    record_command(BotCommand.START)
 
     welcome_text = (
         "👋 Привет! Я MTG Cart Order Bot\n\n"
@@ -50,7 +50,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     user_id = update.effective_user.id
     logger.info(f"User {user_id} requested help")
-    record_command('help')
+    record_command(BotCommand.HELP)
 
     help_text = (
         "📖 Инструкция\n"
@@ -113,7 +113,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     filename = document.file_name.lower()
     if not filename.endswith('.html') and not filename.endswith('.txt'):
         logger.warning(f"Invalid file type: {document.file_name}")
-        record_request('document', 'error_invalid_type')
+        record_request(InputType.DOCUMENT, RequestStatus.ERROR_INVALID_TYPE)
         await update.message.reply_text(
             "❌ Неправильный тип файла\n\n"
             "Пожалуйста, отправьте файл с расширением .html или .txt\n\n"
@@ -125,7 +125,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     max_file_size = int(os.getenv('MAX_FILE_SIZE', '26214400'))  # 25 MB
     if document.file_size and document.file_size > max_file_size:
         logger.warning(f"File too large: {document.file_size} bytes")
-        record_request('document', 'error_too_large')
+        record_request(InputType.DOCUMENT, RequestStatus.ERROR_TOO_LARGE)
         await update.message.reply_text(
             "❌ Файл слишком большой\n\n"
             f"Максимальный размер: {max_file_size / 1024 / 1024:.0f} MB\n"
@@ -157,7 +157,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         processing_time = time.time() - start_time
         
         logger.info(f"Processing completed in {processing_time:.1f}s: {stats}")
-        record_request('document', 'success', stats.get('site_name', ''))
+        record_request(InputType.DOCUMENT, RequestStatus.SUCCESS, stats.get('site_name', ''))
         record_processing(
             processing_time,
             stats.get('site_name', ''),
@@ -190,7 +190,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except FileNotFoundError:
         logger.error(f"File not found: {html_file_path}")
-        record_request('document', 'error_unknown')
+        record_request(InputType.DOCUMENT, RequestStatus.ERROR_UNKNOWN)
         await status_msg.edit_text(
             "❌ Файл не найден\n\n"
             "Попробуйте отправить файл заново."
@@ -201,7 +201,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"ValueError while processing: {error_msg}")
 
         if "Could not determine the website" in error_msg:
-            record_request('document', 'error_unsupported_site')
+            record_request(InputType.DOCUMENT, RequestStatus.ERROR_UNSUPPORTED_SITE)
             await status_msg.edit_text(
                 "❌ Сайт не поддерживается\n\n"
                 "Поддерживаемые сайты:\n"
@@ -211,7 +211,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Используйте /help для инструкций."
             )
         elif "пустой" in error_msg.lower() or "пустая" in error_msg.lower():
-            record_request('document', 'error_empty_cart')
+            record_request(InputType.DOCUMENT, RequestStatus.ERROR_EMPTY_CART)
             await status_msg.edit_text(
                 "❌ В корзине не найдено карт\n\n"
                 "Убедитесь что:\n"
@@ -221,7 +221,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Используйте /help для подробных инструкций."
             )
         else:
-            record_request('document', 'error_parse')
+            record_request(InputType.DOCUMENT, RequestStatus.ERROR_PARSE)
             await status_msg.edit_text(
                 f"❌ Ошибка парсинга HTML\n\n"
                 f"Детали: {error_msg}\n\n"
@@ -234,7 +234,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except OSError as e:
         logger.error(f"OSError while processing: {e}", exc_info=True)
-        record_request('document', 'error_os')
+        record_request(InputType.DOCUMENT, RequestStatus.ERROR_OS)
         await status_msg.edit_text(
             "❌ Ошибка создания файла заказа\n\n"
             "Попробуйте отправить файл заново.\n"
@@ -243,7 +243,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         logger.error(f"Unexpected error: {e}", exc_info=True)
-        record_request('document', 'error_unknown')
+        record_request(InputType.DOCUMENT, RequestStatus.ERROR_UNKNOWN)
         await status_msg.edit_text(
             "❌ Неожиданная ошибка\n\n"
             "Попробуйте позже или напишите /help для справки.\n"
@@ -312,7 +312,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         processing_time = time.time() - start_time
         
         logger.info(f"Processing completed in {processing_time:.1f}s: {stats}")
-        record_request('text', 'success', stats.get('site_name', ''))
+        record_request(InputType.TEXT, RequestStatus.SUCCESS, stats.get('site_name', ''))
         record_processing(
             processing_time,
             stats.get('site_name', ''),
@@ -345,7 +345,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except FileNotFoundError:
         logger.error(f"File not found: {html_file_path}")
-        record_request('text', 'error_unknown')
+        record_request(InputType.TEXT, RequestStatus.ERROR_UNKNOWN)
         await status_msg.edit_text(
             "❌ Файл не найден\n\n"
             "Попробуйте отправить HTML код заново."
@@ -356,7 +356,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"ValueError while processing: {error_msg}")
 
         if "пустой" in error_msg.lower() or "пустая" in error_msg.lower():
-            record_request('text', 'error_empty_cart')
+            record_request(InputType.TEXT, RequestStatus.ERROR_EMPTY_CART)
             await status_msg.edit_text(
                 "❌ В корзине не найдено карт\n\n"
                 "Убедитесь что:\n"
@@ -366,7 +366,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Используйте /help для подробных инструкций."
             )
         else:
-            record_request('text', 'error_parse')
+            record_request(InputType.TEXT, RequestStatus.ERROR_PARSE)
             await status_msg.edit_text(
                 f"❌ Ошибка парсинга HTML\n\n"
                 f"Детали: {error_msg}\n\n"
@@ -379,7 +379,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except OSError as e:
         logger.error(f"OSError while processing: {e}", exc_info=True)
-        record_request('text', 'error_os')
+        record_request(InputType.TEXT, RequestStatus.ERROR_OS)
         await status_msg.edit_text(
             "❌ Ошибка создания файла заказа\n\n"
             "Попробуйте отправить HTML код заново.\n"
@@ -388,7 +388,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         logger.error(f"Unexpected error: {e}", exc_info=True)
-        record_request('text', 'error_unknown')
+        record_request(InputType.TEXT, RequestStatus.ERROR_UNKNOWN)
         await status_msg.edit_text(
             "❌ Неожиданная ошибка\n\n"
             "Попробуйте позже или напишите /help для справки.\n"
