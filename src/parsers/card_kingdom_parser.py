@@ -25,6 +25,10 @@ class CardKingdomParser(BaseCartParser):
         super().__init__(html_path)
         self.format_type = self._detect_format()
 
+    @property
+    def site_name(self) -> str:
+        return "Card Kingdom"
+
     @classmethod
     def can_parse(cls, soup: BeautifulSoup) -> bool:
         """Detect Card Kingdom HTML by its unique markers."""

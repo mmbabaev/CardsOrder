@@ -21,15 +21,15 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"User {user_id} started the bot")
     
     welcome_text = (
-        "👋 Привет! Я Card Kingdom Order Bot\n\n"
-        "Я помогу тебе создать Excel файл заказа из корзины Card Kingdom.\n\n"
+        "👋 Привет! Я MTG Cart Order Bot\n\n"
+        "Я помогу тебе создать Excel файл заказа из корзины MTG сайтов.\n\n"
         "🎴 Что я умею:\n"
-        "✅ Принимаю HTML файлы корзины Card Kingdom\n"
+        "✅ Принимаю HTML файлы корзины Card Kingdom и Star City Games\n"
         "✅ Принимаю HTML код корзины (скопированный текст)\n"
         "✅ Генерирую готовый Excel файл заказа\n"
         "✅ Показываю статистику заказа\n\n"
         "📤 Как использовать:\n"
-        "1. Откройте корзину на сайте Card Kingdom\n"
+        "1. Откройте корзину на сайте (Card Kingdom или Star City Games)\n"
         "2. Сохраните страницу как HTML файл\n"
         "3. Отправьте мне этот файл\n"
         "4. Получите готовый Excel заказ!\n\n"
@@ -166,9 +166,10 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await status_msg.edit_text("📊 Создаю Excel файл...")
         
         with open(excel_file_path, 'rb') as excel_file:
+            site_slug = stats.get('site_name', 'order').lower().replace(' ', '_')
             await update.message.reply_document(
                 document=excel_file,
-                filename=f"order_cardkingdom.xlsx",
+                filename=f"order_{site_slug}.xlsx",
                 caption="✅ Ваш заказ готов!"
             )
         
@@ -194,12 +195,21 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except ValueError as e:
         error_msg = str(e)
         logger.error(f"ValueError while processing: {error_msg}")
-        
-        if "пустой" in error_msg.lower() or "пустая" in error_msg.lower():
+
+        if "Could not determine the website" in error_msg:
+            await status_msg.edit_text(
+                "❌ Сайт не поддерживается\n\n"
+                "Поддерживаемые сайты:\n"
+                "• Card Kingdom (cardkingdom.com)\n"
+                "• Star City Games (starcitygames.com)\n\n"
+                "Убедитесь что отправили страницу корзины с одного из этих сайтов.\n\n"
+                "Используйте /help для инструкций."
+            )
+        elif "пустой" in error_msg.lower() or "пустая" in error_msg.lower():
             await status_msg.edit_text(
                 "❌ В корзине не найдено карт\n\n"
                 "Убедитесь что:\n"
-                "• Корзина не пустая на сайте Card Kingdom\n"
+                "• Корзина не пустая на сайте\n"
                 "• Вы сохранили именно страницу корзины (cart)\n"
                 "• HTML файл сохранен корректно\n\n"
                 "Используйте /help для подробных инструкций."
@@ -214,7 +224,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "• Убедиться что сохранили 'только HTML'\n\n"
                 "Используйте /help для инструкций."
             )
-        
+
     except OSError as e:
         logger.error(f"OSError while processing: {e}", exc_info=True)
         await status_msg.edit_text(
@@ -222,7 +232,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Попробуйте отправить файл заново.\n"
             "Если ошибка повторяется, обратитесь к администратору."
         )
-        
+
     except Exception as e:
         logger.error(f"Unexpected error: {e}", exc_info=True)
         await status_msg.edit_text(
@@ -230,7 +240,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Попробуйте позже или напишите /help для справки.\n"
             "Если проблема повторяется, обратитесь к администратору."
         )
-        
+
     finally:
         # Удаляем временные файлы
         for file_path in [html_file_path, excel_file_path]:
@@ -298,9 +308,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await status_msg.edit_text("📊 Создаю Excel файл...")
         
         with open(excel_file_path, 'rb') as excel_file:
+            site_slug = stats.get('site_name', 'order').lower().replace(' ', '_')
             await update.message.reply_document(
                 document=excel_file,
-                filename=f"order_cardkingdom.xlsx",
+                filename=f"order_{site_slug}.xlsx",
                 caption="✅ Ваш заказ готов!"
             )
         

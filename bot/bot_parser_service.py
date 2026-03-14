@@ -8,7 +8,7 @@ from typing import Dict, List, Tuple
 
 from src.excel_generator import generate_excel
 from src.models import Card
-from src.parser import parse_cart_html
+from src.site_detector import SiteDetector
 
 # Настройка логирования
 logger = logging.getLogger(__name__)
@@ -49,9 +49,12 @@ def parse_and_generate(html_path: str, output_dir: str) -> Tuple[str, Dict[str, 
     logger.info(f"Начинается обработка HTML файла: {html_path}")
     logger.info(f"Директория для вывода: {output_dir}")
     
-    # Парсинг HTML корзины
+    # Определение сайта и парсинг HTML корзины
     try:
-        cards = parse_cart_html(html_path)
+        parser = SiteDetector.detect(html_path)
+        site_name = parser.site_name
+        logger.info(f"Определён сайт: {site_name}")
+        cards = parser.parse()
         logger.info(f"Успешно распарсено {len(cards)} карт")
     except FileNotFoundError as e:
         logger.error(f"HTML файл не найден: {e}")
@@ -90,8 +93,9 @@ def parse_and_generate(html_path: str, output_dir: str) -> Tuple[str, Dict[str, 
     
     # Вычисление статистики заказа
     stats = _calculate_statistics(cards)
+    stats['site_name'] = site_name
     logger.info(f"Статистика заказа: {stats}")
-    
+
     return str(excel_path), stats
 
 

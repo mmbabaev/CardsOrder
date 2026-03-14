@@ -25,6 +25,10 @@ _CONDITION_MAP = {
 class StarCityGamesParser(BaseCartParser):
     """Parser for Star City Games shopping cart HTML."""
 
+    @property
+    def site_name(self) -> str:
+        return "Star City Games"
+
     @classmethod
     def can_parse(cls, soup: BeautifulSoup) -> bool:
         html_str = str(soup)

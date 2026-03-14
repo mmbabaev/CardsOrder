@@ -30,6 +30,12 @@ class BaseCartParser(ABC):
         with open(self.html_path, 'r', encoding='utf-8') as f:
             return BeautifulSoup(f.read(), 'lxml')
 
+    @property
+    @abstractmethod
+    def site_name(self) -> str:
+        """Human-readable site name, e.g. 'Card Kingdom'."""
+        ...
+
     @classmethod
     @abstractmethod
     def can_parse(cls, soup: BeautifulSoup) -> bool:
