@@ -37,20 +37,21 @@ def init_telemetry() -> bool:
     try:
         from opentelemetry._logs import set_logger_provider
         from opentelemetry.sdk._logs import LoggerProvider
-        from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+        from opentelemetry.sdk._logs.export import SimpleLogRecordProcessor
         from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
         from opentelemetry.sdk.resources import Resource, SERVICE_NAME
 
         service_name = os.getenv('OTEL_SERVICE_NAME', 'cards-order-bot')
         # SDK отправляет на локальный OTel Collector; он сам передаёт в Monium с auth
-        collector_endpoint = os.getenv('OTEL_EXPORTER_OTLP_ENDPOINT', 'http://localhost:4318')
+        collector_base = os.getenv('OTEL_EXPORTER_OTLP_ENDPOINT', 'http://localhost:4318')
+        collector_endpoint = collector_base.rstrip('/') + '/v1/logs'
 
         exporter = OTLPLogExporter(endpoint=collector_endpoint)
 
         provider = LoggerProvider(
             resource=Resource(attributes={SERVICE_NAME: service_name}),
         )
-        provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
+        provider.add_log_record_processor(SimpleLogRecordProcessor(exporter))
         set_logger_provider(provider)
 
         _otel_logger = provider.get_logger('cards-order-bot')
