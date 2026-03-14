@@ -40,6 +40,10 @@ ENV/
 !Шаблон\ Заказа.xlsx
 edition_codes_cache.json
 
+# Environment / secrets
+.env
+.env.local
+
 # OS
 .DS_Store
 Thumbs.db
