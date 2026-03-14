@@ -149,7 +149,7 @@ class TestParseCartHtml:
 <html>
 <body>
     <div class="cartItemList">
-        <div class="container-fluid cart-product-list">
+        <div class="container-fluid cart-product-list cart-item-wrapper">
         </div>
     </div>
 </body>
