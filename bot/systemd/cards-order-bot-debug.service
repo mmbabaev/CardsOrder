@@ -8,6 +8,7 @@ User=mbabaev
 WorkingDirectory=/home/mbabaev/CardsOrderDebug
 Environment="PATH=/home/mbabaev/CardsOrderDebug/venv/bin"
 Environment="PYTHONPATH=/home/mbabaev/CardsOrderDebug"
+Environment="BOT_ENV=debug"
 EnvironmentFile=/home/mbabaev/CardsOrderDebug/bot/.env
 ExecStart=/home/mbabaev/CardsOrderDebug/venv/bin/python src/bot/bot.py
 Restart=always

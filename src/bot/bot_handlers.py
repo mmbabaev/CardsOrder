@@ -7,7 +7,7 @@ import logging
 import time
 from pathlib import Path
 from src.parsers.parser_service import parse_and_generate
-from src.telemetry import record_command, record_request, record_processing, BotCommand, InputType, RequestStatus
+from src.telemetry import record_command, record_request, record_processing, record_error, is_debug_mode, BotCommand, InputType, RequestStatus
 
 logger = logging.getLogger(__name__)
 
@@ -190,7 +190,8 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except FileNotFoundError:
         logger.error(f"File not found: {html_file_path}")
-        record_request(InputType.DOCUMENT, RequestStatus.ERROR_UNKNOWN)
+        record_error('file_not_found', 'Temp file missing after download',
+                     input_type=InputType.DOCUMENT, status=RequestStatus.ERROR_UNKNOWN)
         await status_msg.edit_text(
             "❌ Файл не найден\n\n"
             "Попробуйте отправить файл заново."
@@ -201,7 +202,8 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"ValueError while processing: {error_msg}")
 
         if "Could not determine the website" in error_msg:
-            record_request(InputType.DOCUMENT, RequestStatus.ERROR_UNSUPPORTED_SITE)
+            record_error('unsupported_site', error_msg,
+                         input_type=InputType.DOCUMENT, status=RequestStatus.ERROR_UNSUPPORTED_SITE)
             await status_msg.edit_text(
                 "❌ Сайт не поддерживается\n\n"
                 "Поддерживаемые сайты:\n"
@@ -211,7 +213,8 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Используйте /help для инструкций."
             )
         elif "пустой" in error_msg.lower() or "пустая" in error_msg.lower():
-            record_request(InputType.DOCUMENT, RequestStatus.ERROR_EMPTY_CART)
+            record_error('empty_cart', error_msg,
+                         input_type=InputType.DOCUMENT, status=RequestStatus.ERROR_EMPTY_CART)
             await status_msg.edit_text(
                 "❌ В корзине не найдено карт\n\n"
                 "Убедитесь что:\n"
@@ -221,7 +224,8 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Используйте /help для подробных инструкций."
             )
         else:
-            record_request(InputType.DOCUMENT, RequestStatus.ERROR_PARSE)
+            record_error('parse_error', error_msg,
+                         input_type=InputType.DOCUMENT, status=RequestStatus.ERROR_PARSE)
             await status_msg.edit_text(
                 f"❌ Ошибка парсинга HTML\n\n"
                 f"Детали: {error_msg}\n\n"
@@ -234,7 +238,8 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except OSError as e:
         logger.error(f"OSError while processing: {e}", exc_info=True)
-        record_request(InputType.DOCUMENT, RequestStatus.ERROR_OS)
+        record_error('os_error', str(e),
+                     input_type=InputType.DOCUMENT, status=RequestStatus.ERROR_OS)
         await status_msg.edit_text(
             "❌ Ошибка создания файла заказа\n\n"
             "Попробуйте отправить файл заново.\n"
@@ -243,7 +248,8 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         logger.error(f"Unexpected error: {e}", exc_info=True)
-        record_request(InputType.DOCUMENT, RequestStatus.ERROR_UNKNOWN)
+        record_error('unknown_error', str(e),
+                     input_type=InputType.DOCUMENT, status=RequestStatus.ERROR_UNKNOWN)
         await status_msg.edit_text(
             "❌ Неожиданная ошибка\n\n"
             "Попробуйте позже или напишите /help для справки.\n"
@@ -271,7 +277,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text
     logger.info(f"Received text message from user {user_id}, length: {len(text)}")
-    
+
+    # Easter egg: debug builds only — typing "error" triggers a test error in telemetry
+    if is_debug_mode() and text.strip().lower() == 'error':
+        record_error('easter_egg', 'Debug error triggered by user message',
+                     user_id=str(user_id))
+        await update.message.reply_text("💥 Test error sent to telemetry!")
+        return
+
     # Проверка что текст содержит HTML
     if not ('<html' in text.lower() or '<!doctype' in text.lower()):
         logger.info(f"Text doesn't contain HTML tags")
@@ -345,7 +358,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except FileNotFoundError:
         logger.error(f"File not found: {html_file_path}")
-        record_request(InputType.TEXT, RequestStatus.ERROR_UNKNOWN)
+        record_error('file_not_found', 'Temp file missing after write',
+                     input_type=InputType.TEXT, status=RequestStatus.ERROR_UNKNOWN)
         await status_msg.edit_text(
             "❌ Файл не найден\n\n"
             "Попробуйте отправить HTML код заново."
@@ -356,7 +370,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"ValueError while processing: {error_msg}")
 
         if "пустой" in error_msg.lower() or "пустая" in error_msg.lower():
-            record_request(InputType.TEXT, RequestStatus.ERROR_EMPTY_CART)
+            record_error('empty_cart', error_msg,
+                         input_type=InputType.TEXT, status=RequestStatus.ERROR_EMPTY_CART)
             await status_msg.edit_text(
                 "❌ В корзине не найдено карт\n\n"
                 "Убедитесь что:\n"
@@ -366,7 +381,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Используйте /help для подробных инструкций."
             )
         else:
-            record_request(InputType.TEXT, RequestStatus.ERROR_PARSE)
+            record_error('parse_error', error_msg,
+                         input_type=InputType.TEXT, status=RequestStatus.ERROR_PARSE)
             await status_msg.edit_text(
                 f"❌ Ошибка парсинга HTML\n\n"
                 f"Детали: {error_msg}\n\n"
@@ -379,7 +395,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except OSError as e:
         logger.error(f"OSError while processing: {e}", exc_info=True)
-        record_request(InputType.TEXT, RequestStatus.ERROR_OS)
+        record_error('os_error', str(e),
+                     input_type=InputType.TEXT, status=RequestStatus.ERROR_OS)
         await status_msg.edit_text(
             "❌ Ошибка создания файла заказа\n\n"
             "Попробуйте отправить HTML код заново.\n"
@@ -388,7 +405,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         logger.error(f"Unexpected error: {e}", exc_info=True)
-        record_request(InputType.TEXT, RequestStatus.ERROR_UNKNOWN)
+        record_error('unknown_error', str(e),
+                     input_type=InputType.TEXT, status=RequestStatus.ERROR_UNKNOWN)
         await status_msg.edit_text(
             "❌ Неожиданная ошибка\n\n"
             "Попробуйте позже или напишите /help для справки.\n"
@@ -404,6 +422,16 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     logger.info(f"Temporary file removed: {file_path}")
                 except Exception as e:
                     logger.error(f"Failed to remove temporary file {file_path}: {e}")
+
+
+async def error_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Easter egg: /error — fires a test error in telemetry (debug builds only)."""
+    if not is_debug_mode():
+        return
+    user_id = update.effective_user.id
+    record_error('easter_egg_command', '/error command triggered by user',
+                 user_id=str(user_id))
+    await update.message.reply_text("💥 Test error sent to telemetry!")
 
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
