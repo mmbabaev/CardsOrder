@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
 from src.bot.bot_handlers import start_command, help_command, handle_document, handle_text, error_handler
+from src.telemetry import init_telemetry
 
 
 def main():
@@ -28,7 +29,10 @@ def main():
     """
     # Загрузка переменных окружения
     load_dotenv()
-    
+
+    # Инициализация телеметрии Monium (graceful no-op если MONIUM_API_KEY не задан)
+    init_telemetry()
+
     # Настройка логирования
     log_level = os.getenv('LOG_LEVEL', 'INFO')
     logging.basicConfig(

@@ -6,7 +6,8 @@ import os
 import logging
 import time
 from pathlib import Path
-from src.parser_service import parse_and_generate
+from src.parsers.parser_service import parse_and_generate
+from src.telemetry import record_command, record_request, record_processing
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,8 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     user_id = update.effective_user.id
     logger.info(f"User {user_id} started the bot")
-    
+    record_command('start')
+
     welcome_text = (
         "👋 Привет! Я MTG Cart Order Bot\n\n"
         "Я помогу тебе создать Excel файл заказа из корзины MTG сайтов.\n\n"
@@ -48,7 +50,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     user_id = update.effective_user.id
     logger.info(f"User {user_id} requested help")
-    
+    record_command('help')
+
     help_text = (
         "📖 Инструкция\n"
         "👤 Автор: @mbabaev\n\n"
@@ -110,17 +113,19 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     filename = document.file_name.lower()
     if not filename.endswith('.html') and not filename.endswith('.txt'):
         logger.warning(f"Invalid file type: {document.file_name}")
+        record_request('document', 'error_invalid_type')
         await update.message.reply_text(
             "❌ Неправильный тип файла\n\n"
             "Пожалуйста, отправьте файл с расширением .html или .txt\n\n"
             "Используйте /help для инструкций как сохранить HTML страницу."
         )
         return
-    
+
     # Проверка размера файла
     max_file_size = int(os.getenv('MAX_FILE_SIZE', '26214400'))  # 25 MB
     if document.file_size and document.file_size > max_file_size:
         logger.warning(f"File too large: {document.file_size} bytes")
+        record_request('document', 'error_too_large')
         await update.message.reply_text(
             "❌ Файл слишком большой\n\n"
             f"Максимальный размер: {max_file_size / 1024 / 1024:.0f} MB\n"
@@ -152,10 +157,17 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         processing_time = time.time() - start_time
         
         logger.info(f"Processing completed in {processing_time:.1f}s: {stats}")
-        
+        record_request('document', 'success', stats.get('site_name', ''))
+        record_processing(
+            processing_time,
+            stats.get('site_name', ''),
+            stats['total_cards'],
+            float(stats['total_price']),
+        )
+
         # Отправляем Excel файл
         await status_msg.edit_text("📊 Создаю Excel файл...")
-        
+
         with open(excel_file_path, 'rb') as excel_file:
             site_slug = stats.get('site_name', 'order').lower().replace(' ', '_')
             await update.message.reply_document(
@@ -163,7 +175,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 filename=f"order_{site_slug}.xlsx",
                 caption="✅ Ваш заказ готов!"
             )
-        
+
         # Форматируем и отправляем статистику
         stats_text = (
             f"📊 Статистика заказа:\n\n"
@@ -173,21 +185,23 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"• Фойлов: {stats['foil_count']}\n\n"
             f"⏱ Обработано за {processing_time:.1f} секунды"
         )
-        
+
         await status_msg.edit_text(stats_text)
-        
+
     except FileNotFoundError:
         logger.error(f"File not found: {html_file_path}")
+        record_request('document', 'error_unknown')
         await status_msg.edit_text(
             "❌ Файл не найден\n\n"
             "Попробуйте отправить файл заново."
         )
-        
+
     except ValueError as e:
         error_msg = str(e)
         logger.error(f"ValueError while processing: {error_msg}")
 
         if "Could not determine the website" in error_msg:
+            record_request('document', 'error_unsupported_site')
             await status_msg.edit_text(
                 "❌ Сайт не поддерживается\n\n"
                 "Поддерживаемые сайты:\n"
@@ -197,6 +211,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Используйте /help для инструкций."
             )
         elif "пустой" in error_msg.lower() or "пустая" in error_msg.lower():
+            record_request('document', 'error_empty_cart')
             await status_msg.edit_text(
                 "❌ В корзине не найдено карт\n\n"
                 "Убедитесь что:\n"
@@ -206,6 +221,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Используйте /help для подробных инструкций."
             )
         else:
+            record_request('document', 'error_parse')
             await status_msg.edit_text(
                 f"❌ Ошибка парсинга HTML\n\n"
                 f"Детали: {error_msg}\n\n"
@@ -218,6 +234,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except OSError as e:
         logger.error(f"OSError while processing: {e}", exc_info=True)
+        record_request('document', 'error_os')
         await status_msg.edit_text(
             "❌ Ошибка создания файла заказа\n\n"
             "Попробуйте отправить файл заново.\n"
@@ -226,6 +243,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         logger.error(f"Unexpected error: {e}", exc_info=True)
+        record_request('document', 'error_unknown')
         await status_msg.edit_text(
             "❌ Неожиданная ошибка\n\n"
             "Попробуйте позже или напишите /help для справки.\n"
@@ -294,10 +312,17 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         processing_time = time.time() - start_time
         
         logger.info(f"Processing completed in {processing_time:.1f}s: {stats}")
-        
+        record_request('text', 'success', stats.get('site_name', ''))
+        record_processing(
+            processing_time,
+            stats.get('site_name', ''),
+            stats['total_cards'],
+            float(stats['total_price']),
+        )
+
         # Отправляем Excel файл
         await status_msg.edit_text("📊 Создаю Excel файл...")
-        
+
         with open(excel_file_path, 'rb') as excel_file:
             site_slug = stats.get('site_name', 'order').lower().replace(' ', '_')
             await update.message.reply_document(
@@ -305,7 +330,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 filename=f"order_{site_slug}.xlsx",
                 caption="✅ Ваш заказ готов!"
             )
-        
+
         # Форматируем и отправляем статистику
         stats_text = (
             f"📊 Статистика заказа:\n\n"
@@ -315,21 +340,23 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"• Фойлов: {stats['foil_count']}\n\n"
             f"⏱ Обработано за {processing_time:.1f} секунды"
         )
-        
+
         await status_msg.edit_text(stats_text)
-        
+
     except FileNotFoundError:
         logger.error(f"File not found: {html_file_path}")
+        record_request('text', 'error_unknown')
         await status_msg.edit_text(
             "❌ Файл не найден\n\n"
             "Попробуйте отправить HTML код заново."
         )
-        
+
     except ValueError as e:
         error_msg = str(e)
         logger.error(f"ValueError while processing: {error_msg}")
-        
+
         if "пустой" in error_msg.lower() or "пустая" in error_msg.lower():
+            record_request('text', 'error_empty_cart')
             await status_msg.edit_text(
                 "❌ В корзине не найдено карт\n\n"
                 "Убедитесь что:\n"
@@ -339,6 +366,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "Используйте /help для подробных инструкций."
             )
         else:
+            record_request('text', 'error_parse')
             await status_msg.edit_text(
                 f"❌ Ошибка парсинга HTML\n\n"
                 f"Детали: {error_msg}\n\n"
@@ -348,17 +376,19 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "• Отправить файл вместо текста\n\n"
                 "Используйте /help для инструкций."
             )
-        
+
     except OSError as e:
         logger.error(f"OSError while processing: {e}", exc_info=True)
+        record_request('text', 'error_os')
         await status_msg.edit_text(
             "❌ Ошибка создания файла заказа\n\n"
             "Попробуйте отправить HTML код заново.\n"
             "Если ошибка повторяется, обратитесь к администратору."
         )
-        
+
     except Exception as e:
         logger.error(f"Unexpected error: {e}", exc_info=True)
+        record_request('text', 'error_unknown')
         await status_msg.edit_text(
             "❌ Неожиданная ошибка\n\n"
             "Попробуйте позже или напишите /help для справки.\n"

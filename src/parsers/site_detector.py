@@ -6,7 +6,7 @@ from typing import List, Type
 
 from bs4 import BeautifulSoup
 
-from src.base_parser import BaseCartParser
+from src.parsers.base_parser import BaseCartParser
 from src.parsers.card_kingdom_parser import CardKingdomParser
 from src.parsers.starcitygames_parser import StarCityGamesParser
 

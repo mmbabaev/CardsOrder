@@ -5,7 +5,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from src.parsers.starcitygames_parser import StarCityGamesParser
-from src.site_detector import SiteDetector
+from src.parsers.site_detector import SiteDetector
 from src.models import Card
 
 FIXTURE = "tests/fixtures/sample_cart_scg.html"

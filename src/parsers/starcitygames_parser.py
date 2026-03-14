@@ -7,7 +7,7 @@ from typing import List, Optional
 
 from bs4 import BeautifulSoup, Tag
 
-from src.base_parser import BaseCartParser
+from src.parsers.base_parser import BaseCartParser
 from src.models import Card
 
 logger = logging.getLogger(__name__)

@@ -3,7 +3,7 @@
 import pytest
 from pathlib import Path
 
-from src.site_detector import SiteDetector
+from src.parsers.site_detector import SiteDetector
 from src.parsers.card_kingdom_parser import CardKingdomParser
 from src.parsers.starcitygames_parser import StarCityGamesParser
 

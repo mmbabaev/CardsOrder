@@ -7,7 +7,7 @@ from decimal import Decimal
 
 import click
 
-from src.parser import parse_cart_html
+from src.parsers.parser import parse_cart_html
 from src.excel_generator import generate_excel
 
 

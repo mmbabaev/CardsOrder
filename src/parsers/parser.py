@@ -3,7 +3,7 @@
 from typing import List
 
 from src.models import Card
-from src.site_detector import SiteDetector
+from src.parsers.site_detector import SiteDetector
 
 
 def parse_cart_html(html_path: str) -> List[Card]:

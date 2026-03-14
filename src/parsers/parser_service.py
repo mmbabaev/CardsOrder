@@ -8,7 +8,7 @@ from typing import Dict, List, Tuple
 
 from src.excel_generator import generate_excel
 from src.models import Card
-from src.site_detector import SiteDetector
+from src.parsers.site_detector import SiteDetector
 
 # Настройка логирования
 logger = logging.getLogger(__name__)
