@@ -74,8 +74,6 @@ create_archive() {
         --exclude='.pytest_cache' \
         --exclude='tests/' \
         --exclude='venv/' \
-        bot/bot.py \
-        bot/bot_handlers.py \
         bot/requirements-bot.txt \
         bot/systemd/ \
         src/

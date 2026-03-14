@@ -5,7 +5,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
-from bot_handlers import start_command, help_command, handle_document, handle_text, error_handler
+from src.bot.bot_handlers import start_command, help_command, handle_document, handle_text, error_handler
 
 
 def main():

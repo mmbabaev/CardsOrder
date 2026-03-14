@@ -9,7 +9,7 @@ WorkingDirectory=/home/kara/CardsOrder
 Environment="PATH=/home/kara/CardsOrder/venv/bin"
 Environment="PYTHONPATH=/home/kara/CardsOrder"
 EnvironmentFile=/home/kara/CardsOrder/bot/.env
-ExecStart=/home/kara/CardsOrder/venv/bin/python bot/bot.py
+ExecStart=/home/kara/CardsOrder/venv/bin/python src/bot/bot.py
 Restart=always
 RestartSec=10
 StandardOutput=journal
