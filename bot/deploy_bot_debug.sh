@@ -46,9 +46,11 @@ print_success() { echo -e "${GREEN}✓ $1${NC}"; }
 print_error()   { echo -e "${RED}✗ $1${NC}"; }
 print_info()    { echo -e "${YELLOW}→ $1${NC}"; }
 
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 check_directory() {
-    if [[ ! -f "$SCRIPT_DIR/bot.py" ]]; then
-        print_error "Скрипт должен находиться в директории bot/"
+    if [[ ! -f "$PROJECT_ROOT/src/bot/bot.py" ]]; then
+        print_error "src/bot/bot.py не найден. Запустите скрипт из директории bot/"
         exit 1
     fi
     print_success "Проверка директории пройдена"
