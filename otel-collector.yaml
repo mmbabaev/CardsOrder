@@ -20,6 +20,10 @@ service:
       receivers: [ otlp ]
       processors: [ batch ]
       exporters: [ otlp/monium ]
+    metrics:
+      receivers: [ otlp ]
+      processors: [ batch ]
+      exporters: [ otlp/monium ]
 
   telemetry:
     logs:

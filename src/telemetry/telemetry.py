@@ -164,6 +164,8 @@ def record_error(error_type: str, message: str, **attrs) -> None:
         message:    human-readable error description
         **attrs:    extra key-value attributes (input_type, status, site, user_id, …)
     """
+    if _otel_logger is None:
+        return
     from opentelemetry._logs import SeverityNumber
     error_attrs = {'event': 'error', 'error_type': error_type, **attrs}
     _emit_log(message, error_attrs, severity_number=SeverityNumber.ERROR, severity_text='ERROR')
