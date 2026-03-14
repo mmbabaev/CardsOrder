@@ -14,15 +14,12 @@ exporters:
     headers:
       Authorization: "Api-Key ${env:MONIUM_API_KEY}"
       x-monium-project: "${env:MONIUM_PROJECT}"
-  debug:
-    verbosity: detailed
-
 service:
   pipelines:
     logs:
       receivers: [ otlp ]
       processors: [ batch ]
-      exporters: [ otlp/monium, debug ]
+      exporters: [ otlp/monium ]
 
   telemetry:
     logs:
