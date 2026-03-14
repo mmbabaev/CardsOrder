@@ -6,7 +6,7 @@ import os
 import logging
 import time
 from pathlib import Path
-from bot_parser_service import parse_and_generate
+from src.parser_service import parse_and_generate
 
 logger = logging.getLogger(__name__)
 

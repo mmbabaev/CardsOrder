@@ -76,7 +76,6 @@ create_archive() {
         --exclude='venv/' \
         bot/bot.py \
         bot/bot_handlers.py \
-        bot/bot_parser_service.py \
         bot/requirements-bot.txt \
         bot/systemd/ \
         src/
