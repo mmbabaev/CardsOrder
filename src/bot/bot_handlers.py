@@ -7,6 +7,7 @@ import logging
 import time
 from pathlib import Path
 from src.parsers.parser_service import parse_and_generate
+from src.file_extractor import extract_html, SUPPORTED_EXTENSIONS
 from src.telemetry import record_command, record_request, record_processing, record_error, is_debug_mode, BotCommand, InputType, RequestStatus
 
 logger = logging.getLogger(__name__)
@@ -26,8 +27,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "👋 Привет! Я MTG Cart Order Bot\n\n"
         "Я помогу тебе создать Excel файл заказа из корзины MTG сайтов.\n\n"
         "🎴 Что я умею:\n"
-        "✅ Принимаю HTML файлы корзины Card Kingdom и Star City Games\n"
-        "✅ Принимаю HTML код корзины (скопированный текст)\n"
+        "✅ Принимаю страницу корзины в любом формате: .html, .webarchive (Safari), .mhtml (Chrome/Edge) или текст\n"
         "✅ Генерирую готовый Excel файл заказа\n"
         "✅ Показываю статистику заказа\n\n"
         "📤 Как использовать:\n"
@@ -109,15 +109,17 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     document = update.message.document
     logger.info(f"Received document from user {user_id}: {document.file_name}")
     
-    # Проверка что это HTML файл
-    filename = document.file_name.lower()
-    if not filename.endswith('.html') and not filename.endswith('.txt'):
+    file_path_obj = Path(document.file_name)
+    if file_path_obj.suffix.lower() not in SUPPORTED_EXTENSIONS:
         logger.warning(f"Invalid file type: {document.file_name}")
         record_request(InputType.DOCUMENT, RequestStatus.ERROR_INVALID_TYPE)
         await update.message.reply_text(
             "❌ Неправильный тип файла\n\n"
-            "Пожалуйста, отправьте файл с расширением .html или .txt\n\n"
-            "Используйте /help для инструкций как сохранить HTML страницу."
+            "Отправьте страницу корзины в одном из форматов:\n"
+            "• .html — любой браузер\n"
+            "• .webarchive — Safari\n"
+            "• .mhtml — Chrome или Edge\n\n"
+            "Используйте /help для инструкций."
         )
         return
 
