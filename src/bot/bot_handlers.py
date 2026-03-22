@@ -7,6 +7,7 @@ import logging
 import time
 from pathlib import Path
 from src.parsers.parser_service import parse_and_generate
+from src.file_extractor import extract_html, SUPPORTED_EXTENSIONS
 from src.telemetry import record_command, record_request, record_processing, record_error, is_debug_mode, BotCommand, InputType, RequestStatus
 
 logger = logging.getLogger(__name__)
@@ -26,8 +27,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "👋 Привет! Я MTG Cart Order Bot\n\n"
         "Я помогу тебе создать Excel файл заказа из корзины MTG сайтов.\n\n"
         "🎴 Что я умею:\n"
-        "✅ Принимаю HTML файлы корзины Card Kingdom и Star City Games\n"
-        "✅ Принимаю HTML код корзины (скопированный текст)\n"
+        "✅ Принимаю страницу корзины в любом формате: .html, .webarchive (Safari), .mhtml (Chrome/Edge) или текст\n"
         "✅ Генерирую готовый Excel файл заказа\n"
         "✅ Показываю статистику заказа\n\n"
         "📤 Как использовать:\n"
@@ -109,15 +109,18 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     document = update.message.document
     logger.info(f"Received document from user {user_id}: {document.file_name}")
     
-    # Проверка что это HTML файл
-    filename = document.file_name.lower()
-    if not filename.endswith('.html') and not filename.endswith('.txt'):
+    file_path_obj = Path(document.file_name)
+    suffix = file_path_obj.suffix.lower()
+    if suffix and suffix not in SUPPORTED_EXTENSIONS:
         logger.warning(f"Invalid file type: {document.file_name}")
         record_request(InputType.DOCUMENT, RequestStatus.ERROR_INVALID_TYPE)
         await update.message.reply_text(
             "❌ Неправильный тип файла\n\n"
-            "Пожалуйста, отправьте файл с расширением .html или .txt\n\n"
-            "Используйте /help для инструкций как сохранить HTML страницу."
+            "Отправьте страницу корзины в одном из форматов:\n"
+            "• .html — любой браузер\n"
+            "• .webarchive — Safari\n"
+            "• .mhtml — Chrome или Edge\n\n"
+            "Используйте /help для инструкций."
         )
         return
 
@@ -140,18 +143,22 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status_msg = await update.message.reply_text("🎴 Обрабатываю файл...")
     
     temp_dir = os.getenv('TEMP_DIR', '/tmp/cards-order-bot')
+    raw_file_path = None
     html_file_path = None
     excel_file_path = None
-    
+
     try:
-        # Скачиваем файл
         file = await context.bot.get_file(document.file_id)
+        raw_file_path = os.path.join(temp_dir, f"{document.file_unique_id}{file_path_obj.suffix}")
         html_file_path = os.path.join(temp_dir, f"{document.file_unique_id}.html")
-        
-        logger.info(f"Downloading file to {html_file_path}")
-        await file.download_to_drive(html_file_path)
-        
-        # Парсим и генерируем Excel
+
+        logger.info(f"Downloading file to {raw_file_path}")
+        await file.download_to_drive(raw_file_path)
+
+        html_content = extract_html(Path(raw_file_path))
+        with open(html_file_path, 'w', encoding='utf-8') as f:
+            f.write(html_content)
+
         start_time = time.time()
         excel_file_path, stats = parse_and_generate(html_file_path, temp_dir)
         processing_time = time.time() - start_time
@@ -257,8 +264,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
     finally:
-        # Удаляем временные файлы
-        for file_path in [html_file_path, excel_file_path]:
+        for file_path in [raw_file_path, html_file_path, excel_file_path]:
             if file_path and os.path.exists(file_path):
                 try:
                     os.remove(file_path)

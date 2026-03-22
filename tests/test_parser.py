@@ -1,11 +1,29 @@
 """Тесты для HTML парсера карточек Card Kingdom."""
 
+import os
+import tempfile
 import pytest
 from decimal import Decimal
 from pathlib import Path
 
 from src.parsers.parser import parse_cart_html
+from src.parsers.card_kingdom_parser import CardKingdomParser
+from src.file_extractor import extract_html
 from src.models import Card
+
+FIXTURES = Path("tests/fixtures")
+
+
+def parse_from_archive(fixture_name: str):
+    """Extract HTML from an archive fixture and parse it."""
+    html = extract_html(FIXTURES / fixture_name)
+    with tempfile.NamedTemporaryFile(suffix='.html', mode='w', delete=False, encoding='utf-8') as f:
+        f.write(html)
+        tmp = f.name
+    try:
+        return CardKingdomParser(tmp).parse()
+    finally:
+        os.unlink(tmp)
 
 
 class TestParseCartHtml:
@@ -178,6 +196,44 @@ class TestParseCartHtml:
         # Должны быть карты с большим количеством
         multi_quantity_cards = [card for card in cards if card.quantity > 1]
         assert len(multi_quantity_cards) > 0
+
+
+class TestDropdownFormat:
+    """Tests for the dropdown quantity format (Safari .webarchive / Chrome .mht)."""
+
+    def test_webarchive_parses_cards(self):
+        cards = parse_from_archive("sample_cart.webarchive")
+        assert len(cards) > 0
+
+    def test_mht_parses_cards(self):
+        cards = parse_from_archive("sample_cart.mht")
+        assert len(cards) > 0
+
+    def test_webarchive_and_mht_same_result(self):
+        wa_cards = parse_from_archive("sample_cart.webarchive")
+        mht_cards = parse_from_archive("sample_cart.mht")
+        assert sum(c.quantity for c in wa_cards) == sum(c.quantity for c in mht_cards)
+        assert sum(c.total_price for c in wa_cards) == sum(c.total_price for c in mht_cards)
+
+    def test_webarchive_format_detected_as_dropdown(self):
+        html = extract_html(FIXTURES / "sample_cart.webarchive")
+        with tempfile.NamedTemporaryFile(suffix='.html', mode='w', delete=False, encoding='utf-8') as f:
+            f.write(html)
+            tmp = f.name
+        try:
+            parser = CardKingdomParser(tmp)
+            assert parser.format_type == CardKingdomParser.FORMAT_DROPDOWN
+        finally:
+            os.unlink(tmp)
+
+    def test_card_fields_populated(self):
+        for fixture in ("sample_cart.webarchive", "sample_cart.mht"):
+            cards = parse_from_archive(fixture)
+            for card in cards:
+                assert card.quantity > 0
+                assert card.name
+                assert card.price_per_unit > 0
+                assert card.total_price == card.price_per_unit * card.quantity
 
 
 class TestCardModel:

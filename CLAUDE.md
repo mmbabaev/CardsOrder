@@ -10,3 +10,7 @@
 ## Python
 
 Use `python3` (not `python`) — `python` is not available in this environment.
+
+## Code style
+
+Do not write obvious comments — comments that just restate what the code already says.

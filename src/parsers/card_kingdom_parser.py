@@ -20,6 +20,7 @@ class CardKingdomParser(BaseCartParser):
 
     FORMAT_DESKTOP = "desktop"
     FORMAT_MOBILE = "mobile"
+    FORMAT_DROPDOWN = "dropdown"
 
     def __init__(self, html_path: str):
         super().__init__(html_path)
@@ -39,11 +40,13 @@ class CardKingdomParser(BaseCartParser):
             or 'lineitem-quantity-selector' in html_str
         )
 
-    def _detect_format(self) -> Literal["desktop", "mobile"]:
+    def _detect_format(self) -> Literal["desktop", "mobile", "dropdown"]:
         html_str = str(self.soup)
         if 'lineitem-quantity-selector' in html_str:
             return self.FORMAT_DESKTOP
-        elif '<input name="qty"' in html_str or 'class="quantity"' in html_str:
+        elif 'Select quantity, current:' in html_str:
+            return self.FORMAT_DROPDOWN
+        elif '<input name="qty"' in html_str:
             return self.FORMAT_MOBILE
         return self.FORMAT_DESKTOP
 
@@ -112,7 +115,7 @@ class CardKingdomParser(BaseCartParser):
         # Foil
         is_foil = product_link.find('div', class_='foil') is not None
 
-        # Quantity — desktop vs mobile
+        # Quantity — desktop vs mobile vs dropdown
         if self.format_type == self.FORMAT_DESKTOP:
             quantity_selector = item_div.find('lineitem-quantity-selector')
             if not quantity_selector:
@@ -120,13 +123,21 @@ class CardKingdomParser(BaseCartParser):
             quantity_str = quantity_selector.get(':quantity')
             if not quantity_str:
                 raise ValueError(":quantity attribute not found")
-        else:
+        elif self.format_type == self.FORMAT_MOBILE:
             quantity_input = item_div.find('input', {'name': 'qty', 'class': 'quantity'})
             if not quantity_input:
                 raise ValueError("input[name='qty'] not found")
             quantity_str = quantity_input.get('value')
             if not quantity_str:
                 raise ValueError("value attribute not found in quantity input")
+        else:
+            dropdown_btn = item_div.find('a', attrs={'aria-label': re.compile(r'Select quantity, current: \d+')})
+            if not dropdown_btn:
+                raise ValueError("dropdown quantity button not found")
+            match = re.search(r'current: (\d+)', dropdown_btn.get('aria-label', ''))
+            if not match:
+                raise ValueError("could not parse quantity from aria-label")
+            quantity_str = match.group(1)
 
         try:
             quantity = int(quantity_str)
