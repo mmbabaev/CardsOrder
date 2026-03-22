@@ -110,7 +110,8 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"Received document from user {user_id}: {document.file_name}")
     
     file_path_obj = Path(document.file_name)
-    if file_path_obj.suffix.lower() not in SUPPORTED_EXTENSIONS:
+    suffix = file_path_obj.suffix.lower()
+    if suffix and suffix not in SUPPORTED_EXTENSIONS:
         logger.warning(f"Invalid file type: {document.file_name}")
         record_request(InputType.DOCUMENT, RequestStatus.ERROR_INVALID_TYPE)
         await update.message.reply_text(
