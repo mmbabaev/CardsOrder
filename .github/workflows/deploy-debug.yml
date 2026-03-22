@@ -1,0 +1,28 @@
+name: Deploy Debug
+
+on:
+  pull_request:
+    branches: [ main ]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/ssh-key-kara
+          chmod 600 ~/.ssh/ssh-key-kara
+          ssh-keyscan -H 158.160.9.28 >> ~/.ssh/known_hosts
+
+      - name: Write .env.debug file
+        run: echo "${{ secrets.ENV_FILE_DEBUG }}" > bot/.env.debug
+
+      - name: Deploy
+        run: echo "y" | bash bot/deploy_bot_debug.sh
