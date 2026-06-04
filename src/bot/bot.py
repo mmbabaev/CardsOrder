@@ -59,7 +59,11 @@ def main():
     
     # Инициализация Application
     logger.info("Initializing Telegram bot...")
-    application = Application.builder().token(token).build()
+    builder = Application.builder().token(token)
+    proxy_url = os.getenv('TELEGRAM_PROXY_URL')
+    if proxy_url:
+        builder = builder.proxy(proxy_url).get_updates_proxy(proxy_url)
+    application = builder.build()
     
     # Регистрация handlers
     logger.info("Registering handlers...")
