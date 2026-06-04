@@ -1,5 +1,5 @@
 # Telegram Bot dependencies
-python-telegram-bot>=20.7
+python-telegram-bot[socks]>=20.7
 python-dotenv>=1.0.0
 
 # Core project dependencies (from requirements.txt)
