@@ -1,6 +1,6 @@
 """Обработчики команд и сообщений для Telegram бота Card Kingdom Order Bot."""
 
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 import os
 import logging
@@ -8,7 +8,12 @@ import time
 from pathlib import Path
 from src.parsers.parser_service import parse_and_generate
 from src.file_extractor import extract_html, SUPPORTED_EXTENSIONS
-from src.telemetry import record_command, record_request, record_processing, record_error, is_debug_mode, BotCommand, InputType, RequestStatus
+from src.telemetry import (
+    record_command, record_request, record_order, record_error,
+    get_summary, format_summary,
+    get_orders_count, get_orders_page, get_monthly_orders, format_orders, ORDERS_PER_PAGE,
+    is_debug_mode, BotCommand, InputType, RequestStatus,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +26,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     user_id = update.effective_user.id
     logger.info(f"User {user_id} started the bot")
-    record_command(BotCommand.START)
+    record_command(BotCommand.START, user_id=user_id)
 
     welcome_text = (
         "👋 Привет! Я MTG Cart Order Bot\n\n"
@@ -50,7 +55,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     user_id = update.effective_user.id
     logger.info(f"User {user_id} requested help")
-    record_command(BotCommand.HELP)
+    record_command(BotCommand.HELP, user_id=user_id)
 
     help_text = (
         "📖 Инструкция\n"
@@ -113,7 +118,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     suffix = file_path_obj.suffix.lower()
     if suffix and suffix not in SUPPORTED_EXTENSIONS:
         logger.warning(f"Invalid file type: {document.file_name}")
-        record_request(InputType.DOCUMENT, RequestStatus.ERROR_INVALID_TYPE)
+        record_request(InputType.DOCUMENT, RequestStatus.ERROR_INVALID_TYPE, user_id=user_id)
         await update.message.reply_text(
             "❌ Неправильный тип файла\n\n"
             "Отправьте страницу корзины в одном из форматов:\n"
@@ -128,7 +133,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     max_file_size = int(os.getenv('MAX_FILE_SIZE', '26214400'))  # 25 MB
     if document.file_size and document.file_size > max_file_size:
         logger.warning(f"File too large: {document.file_size} bytes")
-        record_request(InputType.DOCUMENT, RequestStatus.ERROR_TOO_LARGE)
+        record_request(InputType.DOCUMENT, RequestStatus.ERROR_TOO_LARGE, user_id=user_id)
         await update.message.reply_text(
             "❌ Файл слишком большой\n\n"
             f"Максимальный размер: {max_file_size / 1024 / 1024:.0f} MB\n"
@@ -164,12 +169,16 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         processing_time = time.time() - start_time
         
         logger.info(f"Processing completed in {processing_time:.1f}s: {stats}")
-        record_request(InputType.DOCUMENT, RequestStatus.SUCCESS, stats.get('site_name', ''))
-        record_processing(
-            processing_time,
+        record_request(InputType.DOCUMENT, RequestStatus.SUCCESS, stats.get('site_name', ''), user_id=user_id)
+        record_order(
             stats.get('site_name', ''),
             stats['total_cards'],
+            stats['total_quantity'],
             float(stats['total_price']),
+            stats['foil_count'],
+            input_type=InputType.DOCUMENT,
+            duration=processing_time,
+            user_id=user_id,
         )
 
         # Отправляем Excel файл
@@ -331,12 +340,16 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         processing_time = time.time() - start_time
         
         logger.info(f"Processing completed in {processing_time:.1f}s: {stats}")
-        record_request(InputType.TEXT, RequestStatus.SUCCESS, stats.get('site_name', ''))
-        record_processing(
-            processing_time,
+        record_request(InputType.TEXT, RequestStatus.SUCCESS, stats.get('site_name', ''), user_id=user_id)
+        record_order(
             stats.get('site_name', ''),
             stats['total_cards'],
+            stats['total_quantity'],
             float(stats['total_price']),
+            stats['foil_count'],
+            input_type=InputType.TEXT,
+            duration=processing_time,
+            user_id=user_id,
         )
 
         # Отправляем Excel файл
@@ -428,6 +441,57 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     logger.info(f"Temporary file removed: {file_path}")
                 except Exception as e:
                     logger.error(f"Failed to remove temporary file {file_path}: {e}")
+
+
+def _is_admin(update: Update) -> bool:
+    admin = os.getenv('ADMIN_CHAT_ID')
+    return bool(admin) and str(update.effective_user.id) == str(admin)
+
+
+async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/stats — bot usage summary. Admin-only (ADMIN_CHAT_ID); silent for others."""
+    if not _is_admin(update):
+        return
+    summary = get_summary()
+    if summary is None:
+        await update.message.reply_text("Аналитика недоступна.")
+        return
+    await update.message.reply_text(format_summary(summary))
+
+
+def _orders_view(page: int):
+    """Build (text, keyboard) for the order-history page."""
+    total = get_orders_count()
+    pages = max(1, (total + ORDERS_PER_PAGE - 1) // ORDERS_PER_PAGE)
+    page = max(0, min(page, pages - 1))
+    text = format_orders(get_monthly_orders(), get_orders_page(page), page, total)
+    buttons = []
+    if page > 0:
+        buttons.append(InlineKeyboardButton("◀", callback_data=f"orders:{page - 1}"))
+    if page < pages - 1:
+        buttons.append(InlineKeyboardButton("▶", callback_data=f"orders:{page + 1}"))
+    keyboard = InlineKeyboardMarkup([buttons]) if buttons else None
+    return text, keyboard
+
+
+async def orders_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/orders — order history with monthly totals, paginated. Admin-only."""
+    if not _is_admin(update):
+        return
+    text, keyboard = _orders_view(0)
+    await update.message.reply_text(text, reply_markup=keyboard)
+
+
+async def orders_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle ◀/▶ pagination for /orders."""
+    query = update.callback_query
+    if not _is_admin(update):
+        await query.answer()
+        return
+    page = int(query.data.split(':')[1])
+    text, keyboard = _orders_view(page)
+    await query.answer()
+    await query.edit_message_text(text, reply_markup=keyboard)
 
 
 async def error_command(update: Update, context: ContextTypes.DEFAULT_TYPE):

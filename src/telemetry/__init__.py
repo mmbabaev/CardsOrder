@@ -1,12 +1,35 @@
-from .telemetry import init_telemetry, record_command, record_request, record_processing, record_error, is_debug_mode
+from .telemetry import (
+    init_telemetry,
+    configure_alerts,
+    record_command,
+    record_request,
+    record_order,
+    record_error,
+    get_summary,
+    format_summary,
+    get_orders_count,
+    get_orders_page,
+    get_monthly_orders,
+    format_orders,
+    ORDERS_PER_PAGE,
+    is_debug_mode,
+)
 from .enums import BotCommand, InputType, RequestStatus
 
 __all__ = [
     'init_telemetry',
+    'configure_alerts',
     'record_command',
     'record_request',
-    'record_processing',
+    'record_order',
     'record_error',
+    'get_summary',
+    'format_summary',
+    'get_orders_count',
+    'get_orders_page',
+    'get_monthly_orders',
+    'format_orders',
+    'ORDERS_PER_PAGE',
     'is_debug_mode',
     'BotCommand',
     'InputType',

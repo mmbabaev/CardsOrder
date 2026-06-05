@@ -7,10 +7,8 @@ click==8.1.7
 # Опциональные зависимости (для расширенных функций)
 requests==2.31.0
 
-# Телеметрия Monium (OpenTelemetry logs via HTTP)
-opentelemetry-api==1.40.0
-opentelemetry-sdk==1.40.0
-opentelemetry-exporter-otlp-proto-http==1.40.0
+# Аналитика + алерты об ошибках
+botstat @ git+https://github.com/mmbabaev/botstat.git@main
 
 # Разработка
 pytest==7.4.3
