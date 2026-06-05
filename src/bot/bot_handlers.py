@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 from src.parsers.parser_service import parse_and_generate
 from src.file_extractor import extract_html, SUPPORTED_EXTENSIONS
-from src.telemetry import record_command, record_request, record_processing, record_error, is_debug_mode, BotCommand, InputType, RequestStatus
+from src.telemetry import record_command, record_request, record_processing, record_error, get_summary, format_summary, is_debug_mode, BotCommand, InputType, RequestStatus
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     user_id = update.effective_user.id
     logger.info(f"User {user_id} started the bot")
-    record_command(BotCommand.START)
+    record_command(BotCommand.START, user_id=user_id)
 
     welcome_text = (
         "👋 Привет! Я MTG Cart Order Bot\n\n"
@@ -50,7 +50,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     user_id = update.effective_user.id
     logger.info(f"User {user_id} requested help")
-    record_command(BotCommand.HELP)
+    record_command(BotCommand.HELP, user_id=user_id)
 
     help_text = (
         "📖 Инструкция\n"
@@ -113,7 +113,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     suffix = file_path_obj.suffix.lower()
     if suffix and suffix not in SUPPORTED_EXTENSIONS:
         logger.warning(f"Invalid file type: {document.file_name}")
-        record_request(InputType.DOCUMENT, RequestStatus.ERROR_INVALID_TYPE)
+        record_request(InputType.DOCUMENT, RequestStatus.ERROR_INVALID_TYPE, user_id=user_id)
         await update.message.reply_text(
             "❌ Неправильный тип файла\n\n"
             "Отправьте страницу корзины в одном из форматов:\n"
@@ -128,7 +128,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     max_file_size = int(os.getenv('MAX_FILE_SIZE', '26214400'))  # 25 MB
     if document.file_size and document.file_size > max_file_size:
         logger.warning(f"File too large: {document.file_size} bytes")
-        record_request(InputType.DOCUMENT, RequestStatus.ERROR_TOO_LARGE)
+        record_request(InputType.DOCUMENT, RequestStatus.ERROR_TOO_LARGE, user_id=user_id)
         await update.message.reply_text(
             "❌ Файл слишком большой\n\n"
             f"Максимальный размер: {max_file_size / 1024 / 1024:.0f} MB\n"
@@ -164,12 +164,13 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
         processing_time = time.time() - start_time
         
         logger.info(f"Processing completed in {processing_time:.1f}s: {stats}")
-        record_request(InputType.DOCUMENT, RequestStatus.SUCCESS, stats.get('site_name', ''))
+        record_request(InputType.DOCUMENT, RequestStatus.SUCCESS, stats.get('site_name', ''), user_id=user_id)
         record_processing(
             processing_time,
             stats.get('site_name', ''),
             stats['total_cards'],
             float(stats['total_price']),
+            user_id=user_id,
         )
 
         # Отправляем Excel файл
@@ -331,12 +332,13 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         processing_time = time.time() - start_time
         
         logger.info(f"Processing completed in {processing_time:.1f}s: {stats}")
-        record_request(InputType.TEXT, RequestStatus.SUCCESS, stats.get('site_name', ''))
+        record_request(InputType.TEXT, RequestStatus.SUCCESS, stats.get('site_name', ''), user_id=user_id)
         record_processing(
             processing_time,
             stats.get('site_name', ''),
             stats['total_cards'],
             float(stats['total_price']),
+            user_id=user_id,
         )
 
         # Отправляем Excel файл
@@ -428,6 +430,19 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     logger.info(f"Temporary file removed: {file_path}")
                 except Exception as e:
                     logger.error(f"Failed to remove temporary file {file_path}: {e}")
+
+
+async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """/stats — bot usage summary. Admin-only (ADMIN_CHAT_ID); silent for others."""
+    user_id = update.effective_user.id
+    admin = os.getenv('ADMIN_CHAT_ID')
+    if not admin or str(user_id) != str(admin):
+        return
+    summary = get_summary()
+    if summary is None:
+        await update.message.reply_text("Аналитика недоступна.")
+        return
+    await update.message.reply_text(format_summary(summary))
 
 
 async def error_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
