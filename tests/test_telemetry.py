@@ -70,6 +70,33 @@ def test_alert_scheduled_on_error(telemetry):
     assert "parse_error" in sent[0][1]
 
 
+def test_record_order_and_history(telemetry):
+    telemetry.record_order("Card Kingdom", 10, 12, 145.0, 2, input_type="document", duration=1.2, user_id=1)
+    telemetry.record_order("SCG", 5, 5, 50.0, 0, input_type="text", user_id=2)
+
+    assert telemetry.get_orders_count() == 2
+    page = telemetry.get_orders_page(0)
+    assert [e.name for e in page] == ["scg", "card_kingdom"]  # newest first
+    assert page[0].attributes["total_price"] == 50.0
+    assert page[1].attributes["foil_count"] == 2
+
+    monthly = telemetry.get_monthly_orders()
+    assert monthly[-1]["count"] == 2
+    assert monthly[-1]["sum"] == 195.0
+
+    text = telemetry.format_orders(monthly, page, 0, 2)
+    assert "Заказы по месяцам" in text
+    assert "card_kingdom" in text
+
+
+def test_orders_pagination(telemetry):
+    for i in range(12):
+        telemetry.record_order("ck", 1, 1, float(i), 0, user_id=1)
+    assert telemetry.get_orders_count() == 12
+    assert len(telemetry.get_orders_page(0)) == 10
+    assert len(telemetry.get_orders_page(1)) == 2
+
+
 def test_no_alert_without_admin(telemetry):
     sent = []
 

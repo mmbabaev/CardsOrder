@@ -3,9 +3,9 @@ import logging
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 
-from src.bot.bot_handlers import start_command, help_command, handle_document, handle_text, error_command, error_handler, stats_command
+from src.bot.bot_handlers import start_command, help_command, handle_document, handle_text, error_command, error_handler, stats_command, orders_command, orders_callback
 from src.telemetry import init_telemetry, configure_alerts
 
 
@@ -73,6 +73,8 @@ def main():
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("stats", stats_command))
+    application.add_handler(CommandHandler("orders", orders_command))
+    application.add_handler(CallbackQueryHandler(orders_callback, pattern=r"^orders:"))
     application.add_handler(CommandHandler("error", error_command))
     application.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))

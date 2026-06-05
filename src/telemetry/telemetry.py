@@ -87,22 +87,30 @@ def record_request(
     _analytics.record_request(str(status), user_id=user_id, **attrs)
 
 
-def record_processing(
-    duration: float,
+def record_order(
     site: str,
     total_cards: int,
+    total_quantity: int,
     total_price: float,
+    foil_count: int,
+    input_type: str = '',
+    duration: Optional[float] = None,
     user_id: Optional[int] = None,
 ) -> None:
+    """Persist one completed order as an 'order' event (full history record)."""
     if _analytics is None:
         return
+    attrs = {
+        'input_type': str(input_type),
+        'total_cards': int(total_cards),
+        'total_quantity': int(total_quantity),
+        'total_price': round(float(total_price), 2),
+        'foil_count': int(foil_count),
+    }
+    if duration is not None:
+        attrs['duration_seconds'] = round(duration, 2)
     _analytics.record_event(
-        'processing',
-        site.lower().replace(' ', '_'),
-        user_id=user_id,
-        duration_seconds=round(duration, 2),
-        total_cards=total_cards,
-        total_price_usd=round(total_price, 2),
+        'order', site.lower().replace(' ', '_'), user_id=user_id, **attrs
     )
 
 
@@ -139,4 +147,51 @@ def format_summary(s: dict) -> str:
         lines.append("")
         lines.append("📈 По статусам:")
         lines += [f"  • {st}: {n}" for st, n in s['by_status'].items()]
+    return "\n".join(lines)
+
+
+ORDERS_PER_PAGE = 10
+
+
+def get_orders_count() -> int:
+    return _analytics.count(event_type='order') if _analytics is not None else 0
+
+
+def get_orders_page(page: int, per_page: int = ORDERS_PER_PAGE):
+    if _analytics is None:
+        return []
+    return _analytics.recent(
+        event_type='order', limit=per_page, offset=max(0, page) * per_page
+    )
+
+
+def get_monthly_orders():
+    if _analytics is None:
+        return []
+    return _analytics.timeseries('total_price', event_type='order', bucket='month')
+
+
+def format_orders(monthly, orders, page: int, total: int, per_page: int = ORDERS_PER_PAGE) -> str:
+    import datetime
+
+    lines = ["📦 Заказы по месяцам:"]
+    if monthly:
+        for r in reversed(monthly[-12:]):
+            lines.append(f"  • {r['period']}: {r['count']} заказов на ${r['sum']:.2f}")
+    else:
+        lines.append("  (пока нет заказов)")
+
+    pages = max(1, (total + per_page - 1) // per_page)
+    lines.append("")
+    lines.append(f"🕘 История (стр. {page + 1}/{pages}, всего {total}):")
+    for e in orders:
+        when = datetime.datetime.fromtimestamp(
+            e.ts_ns / 1e9, datetime.timezone.utc
+        ).strftime('%d.%m %H:%M')
+        a = e.attributes
+        price = a.get('total_price', 0)
+        line = f"  • {when} — {e.name}, {a.get('total_cards', '?')} карт, ${price:.2f}"
+        if e.user_id:
+            line += f" (id {e.user_id})"
+        lines.append(line)
     return "\n".join(lines)
